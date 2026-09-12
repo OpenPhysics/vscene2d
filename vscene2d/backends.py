@@ -36,6 +36,9 @@ class NullBackend:
     def on_mouse_down(self, cb):
         pass
 
+    def on_mouse_up(self, cb):
+        pass
+
 
 class IpycanvasBackend:
     """Two-layer canvas: static grid underneath, moving objects on top.
@@ -70,6 +73,9 @@ class IpycanvasBackend:
 
     def on_mouse_down(self, cb):
         self.fg.on_mouse_down(cb)
+
+    def on_mouse_up(self, cb):
+        self.fg.on_mouse_up(cb)
 
     # --- drawing ------------------------------------------------------
     def draw(self, prims, cam, camera_changed=True):

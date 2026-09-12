@@ -43,8 +43,6 @@ class Graph:
         live = self.scene.mode == "live" if mode is None else (mode == "live")
         self.backend = (make_backend(width, height, background, prefer_live=True)
                         if live else NullBackend(width, height, background))
-        if not self.backend.is_live:
-            self.backend = NullBackend(width, height, background)
         self.recorder = Recorder(max_frames=max_frames)
         self._cam_key = None
         self._displayed = False

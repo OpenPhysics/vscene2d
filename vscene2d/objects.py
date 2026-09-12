@@ -332,9 +332,13 @@ class AttachedArrow(Arrow):
             self.visible = False
 
 
+_TRAIL_DEFAULT_COLOR = color.red
+
+
 def attach_trail(obj, retain=None, color=None, lw=2):
     """Give an existing object a trail."""
-    t = Trail(obj, retain=retain, color=color or getattr(obj, "color", "#e34a33"),
+    t = Trail(obj, retain=retain,
+              color=color or getattr(obj, "color", _TRAIL_DEFAULT_COLOR),
               lw=lw, scene=obj.scene)
     obj.trail = t
     return t
