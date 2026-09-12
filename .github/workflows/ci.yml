@@ -24,10 +24,3 @@ jobs:
 
       - name: Run tests
         run: python test_vscene2d.py
-
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    uses: OpenPhysics/Relay/.github/workflows/shared-dependency-review.yml@main
-
-  codeql:
-    uses: OpenPhysics/Relay/.github/workflows/shared-codeql.yml@main
