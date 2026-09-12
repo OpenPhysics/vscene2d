@@ -78,8 +78,8 @@ class Scene:
         if autoscale is None:
             autoscale = range is None
         self.camera = Camera(width, height,
-                             center=(center.x, center.y) if center else (0.0, 0.0),
-                             range_=range if range else 1.0,
+                             center=(center.x, center.y) if center is not None else (0.0, 0.0),
+                             range_=range if range is not None else 1.0,
                              autoscale=autoscale)
         if range is not None:
             self.camera._seeded = True
@@ -100,6 +100,7 @@ class Scene:
         if self.backend.is_live:
             self.backend.on_mouse_move(self._on_move)
             self.backend.on_mouse_down(self._on_down)
+            self.backend.on_mouse_up(self._on_up)
             self.show()
 
     # --- registry -----------------------------------------------------
@@ -134,6 +135,10 @@ class Scene:
         self._on_move(px, py)
         self.mouse.clicked = True
         self.mouse.pressed = True
+
+    def _on_up(self, px, py):
+        self._on_move(px, py)
+        self.mouse.pressed = False
 
     # --- drawing ------------------------------------------------------
     def _autoscale(self):
