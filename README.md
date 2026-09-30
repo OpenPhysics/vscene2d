@@ -31,6 +31,9 @@ JupyterLab 4 and Notebook 7 pick up ipycanvas automatically. In Colab, run
 `from google.colab import output; output.enable_custom_widget_manager()` first —
 or skip the widget entirely and use `mode="record"`, which needs nothing but a browser.
 
+See `vscene2d_tour.ipynb` for a guided notebook tour and `demos_orbit_and_shm.html` for
+exported standalone animations.
+
 ---
 
 ## The two things this fixes about VPython in a physics course
@@ -212,3 +215,7 @@ No test framework and no display needed — it runs against the headless backend
 prints a line per check. Covers vector algebra, the camera transform and its round-trip, autoscale stability,
 substepping against analytic projectile range and flight time, energy conservation, the
 delta encoding round-trip against a fresh render, and the exported HTML's structure.
+
+## Licence
+
+MIT.
