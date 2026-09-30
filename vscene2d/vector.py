@@ -1,10 +1,11 @@
 """A 2D vector, mirroring VPython's `vector()` ergonomics.
 
-Deliberately supports in-place `+=` by *rebinding* rather than mutating, so
-that `ball.pos += v*dt` goes through the property setter on the object and
-triggers the usual bookkeeping (trail points, autoscale).  This is why
-`vector` is immutable: mutation would silently bypass the setter, which is
-the single most confusing failure mode a student can hit.
+`vector` is immutable, so `ball.pos += v*dt` *rebinds* `ball.pos` to a new
+vector rather than mutating the old one.  That matters because trails store
+the positions they sample: if `ball.pos.x = 5` mutated in place, every point
+the trail had recorded from that same object would move with it, and the
+path would collapse onto the ball -- the most confusing failure mode a
+student could hit.
 """
 
 from __future__ import annotations
@@ -17,7 +18,13 @@ class vector:
 
     __slots__ = ("_x", "_y")
 
-    def __init__(self, x=0.0, y=0.0):
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        # Accept VPython's `vector(x, y, 0)` so 3D code pastes in unchanged.
+        if z != 0:
+            raise ValueError(
+                "vscene2d is 2D -- vector() takes (x, y); a z component "
+                "is only accepted when it is 0."
+            )
         object.__setattr__(self, "_x", float(x))
         object.__setattr__(self, "_y", float(y))
 
@@ -34,12 +41,18 @@ class vector:
         raise AttributeError(
             "vector is immutable -- build a new one, e.g. "
             "`ball.pos = vector(ball.pos.x + 1, ball.pos.y)`. "
-            "Mutating in place would skip the redraw."
+            "Mutating in place would corrupt any trail recorded from it."
         )
 
     # --- arithmetic ---------------------------------------------------
     def __add__(self, o):
         return vector(self._x + o.x, self._y + o.y)
+
+    def __radd__(self, o):
+        # `sum(forces)` starts from the integer 0.
+        if o == 0:
+            return self
+        return NotImplemented
 
     def __sub__(self, o):
         return vector(self._x - o.x, self._y - o.y)

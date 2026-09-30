@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import math
 
-_GROW = 1.30   # headroom when growing, so rescales are rare
 _PAD = 0.08    # margin as a fraction of the visible range
 
 

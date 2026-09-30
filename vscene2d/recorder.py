@@ -24,6 +24,7 @@ frame, which is quadratic in storage if stored naively; since trails only ever
 
 from __future__ import annotations
 
+import html
 import json
 import uuid
 
@@ -85,11 +86,14 @@ class Recorder:
         }
 
     def html(self, width, height, background="#ffffff", fps=30, title=""):
+        # Escape "<" so a label containing "</script>" can't end the script
+        # block early.  Substitute the data last so text inside it is never
+        # mistaken for a template placeholder.
         data = json.dumps(self.payload(width, height, background, fps),
-                          separators=(",", ":"))
+                          separators=(",", ":")).replace("<", "\\u003c")
         return _PLAYER_HTML.replace("__UID__", "vs" + uuid.uuid4().hex[:8]) \
-                           .replace("__DATA__", data) \
-                           .replace("__TITLE__", title or "")
+                           .replace("__TITLE__", html.escape(title or "")) \
+                           .replace("__DATA__", data)
 
 
 def _round_prim(p):
@@ -165,7 +169,7 @@ _PLAYER_HTML = """
       var p = P[i], a;
       if (p.t === "circle"){
         a = C.px(p.x,p.y);
-        g.beginPath(); g.arc(a[0],a[1],Math.max(p.r*C.s,1),0,6.2832);
+        g.beginPath(); g.arc(a[0],a[1],p.rpx||Math.max(p.r*C.s,1),0,6.2832);
         if (p.fill){ g.fillStyle=p.fill; g.fill(); }
         if (p.stroke){ g.strokeStyle=p.stroke; g.lineWidth=p.lw||1; g.stroke(); }
       } else if (p.t === "rect"){

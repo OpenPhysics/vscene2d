@@ -40,10 +40,25 @@ def get_scene():
 
 
 class Mouse:
+    """Cursor state in world coordinates.
+
+    ``clicked`` is True once per click: reading it clears it, so
+    ``if scene.mouse.clicked:`` in a loop fires once, not forever after.
+    """
+
     def __init__(self):
         self.pos = vector(0, 0)
         self.pressed = False
-        self.clicked = False
+        self._clicked = False
+
+    @property
+    def clicked(self):
+        c, self._clicked = self._clicked, False
+        return c
+
+    @clicked.setter
+    def clicked(self, value):
+        self._clicked = bool(value)
 
 
 class Scene:
@@ -220,8 +235,13 @@ class Scene:
         self.frame += 1
 
     # --- animation loops ----------------------------------------------
-    def rate(self, fps):
-        """VPython-compatible: render a frame and pace the loop to ``fps``."""
+    def rate(self, fps, dt=None):
+        """VPython-compatible: render a frame and pace the loop to ``fps``.
+
+        ``scene.t`` can't see the loop's own timestep, so pass it as ``dt`` to
+        keep ``scene.t`` (and the player's time readout) in simulated time.
+        Without it, ``scene.t`` advances by ``1/fps`` per call.
+        """
         self._fps_hint = fps
         now = time.perf_counter()
         target = getattr(self, "_next_tick", None)
@@ -239,7 +259,7 @@ class Scene:
                           "Try Scene(mode='record') and scene.player(), or "
                           "scene.run(step, dt=..., fps=30)." % fps)
                 self._next_tick = max(target + 1.0 / fps, time.perf_counter())
-        self.t += 1.0 / fps
+        self.t += dt if dt is not None else 1.0 / fps
 
     def run(self, step, dt, duration=None, until=None, fps=30, speed=1.0,
             realtime=None, max_frames=None):
@@ -248,6 +268,8 @@ class Scene:
         ``step`` is called as ``step(dt)`` or ``step(dt, t)``.
         ``speed`` is simulated seconds per real second (0.25 = slow motion).
         ``until`` is a predicate; the run stops as soon as it returns True.
+        ``max_frames`` caps the frames rendered by this call; without it the
+        run stops once the scene's recorder is full.
         """
         if realtime is None:
             realtime = (self.mode == "live")
@@ -257,15 +279,21 @@ class Scene:
             nargs = 1
         call = (lambda: step(dt, self.t)) if nargs >= 2 else (lambda: step(dt))
 
+        # Carry the fractional remainder from frame to frame so the average
+        # playback rate is exactly `speed`, not rounded to a whole number of
+        # substeps (dt=0.01 at 30 fps would otherwise play at 0.9x).
         per_frame = speed / fps
-        nsub = max(1, int(round(per_frame / dt)))
+        owed = 0.0
         t_end = None if duration is None else self.t + duration
-        cap = max_frames if max_frames is not None else self.recorder.max_frames
+        start_frame = self.frame
         budget = 1.0 / fps
         wall = time.perf_counter()
 
         self.render()
         while True:
+            owed += per_frame
+            nsub = max(1, int(owed / dt + 1e-9))
+            owed -= nsub * dt
             for _ in range(nsub):
                 call()
                 self.t += dt
@@ -277,7 +305,10 @@ class Scene:
             self.render()
             if t_end is not None and self.t >= t_end:
                 return self
-            if self.frame >= cap:
+            if max_frames is not None:
+                if self.frame - start_frame >= max_frames:
+                    return self
+            elif self.frame >= self.recorder.max_frames:
                 return self
             if realtime:
                 wall += budget
@@ -337,6 +368,6 @@ class Scene:
         return self
 
 
-def rate(fps):
+def rate(fps, dt=None):
     """Module-level ``rate()`` -- paces the current scene, exactly like VPython."""
-    get_scene().rate(fps)
+    get_scene().rate(fps, dt)

@@ -33,7 +33,14 @@ try:
     a.x = 9
     check("immutable", False)
 except AttributeError as e:
-    check("immutable, with a useful message", "redraw" in str(e))
+    check("immutable, with a useful message", "trail" in str(e))
+check("sum() of vectors", sum([vector(1, 2), vector(3, 4)]) == vector(4, 6))
+check("VPython-style vector(x, y, 0)", vector(1, 2, 0) == vector(1, 2))
+try:
+    vector(1, 2, 3)
+    check("nonzero z rejected", False)
+except ValueError:
+    check("nonzero z rejected", True)
 
 print("\n[camera: equal aspect]")
 cam = Camera(640, 480, range_=10)
@@ -176,12 +183,19 @@ bx = Box(pos=vector(1, 1), size=vector(1, 0.5), angle=math.pi / 4)
 lb = Label(pos=vector(0, 2), text="hello")
 sg = Segment(start=vector(-1, -1), end=vector(1, -1))
 cv = Curve(points=[vector(0, 0), vector(1, 1), vector(2, 0)])
+bl = Ball(pos=vector(0, 1), radius=0.1)
+ar = Arrow(pos=vector(0, 0), axis=vector(1, 1))
 out = s3._display_list()
 kinds = {p["t"] for p in out}
-check("all primitive kinds emitted", kinds >= {"poly", "rect", "text"}, str(sorted(kinds)))
+check("all primitive kinds emitted", kinds == {"circle", "rect", "poly", "arrow", "text"},
+      str(sorted(kinds)))
 check("rotated box bounds grow", bx.bounds()[2] - bx.bounds()[0] > 1.0)
-check("spring polyline is non-degenerate",
-      len([p for p in out if p["t"] == "poly" and len(p["pts"]) > 20]) >= 1)
+sp_out = []
+sp.emit(sp_out, s3.camera)
+pts = sp_out[0]["pts"]
+peaks = sum(1 for i in range(1, len(pts), 2) if pts[i] > 0.1)
+check("spring draws the requested coil count", peaks == 8, f"peaks={peaks}")
+check("spring runs from start to end", pts[:2] == [0.0, 0.0] and pts[-2:] == [2.0, 0.0])
 s3.render()
 check("render works with no live backend", len(s3.recorder) == 1)
 
@@ -191,6 +205,48 @@ check("explicit range disables autoscale", s4.camera.autoscale is False)
 Ball(pos=vector(100, 100), radius=1, scene=s4)
 s4.render()
 check("pinned view does not chase the object", abs(s4.camera.ry - 5) < 1e-9)
+
+print("\n[timekeeping]")
+s5 = Scene(mode="record")
+Ball(pos=vector(0, 0), scene=s5)
+for _ in range(100):
+    s5.rate(100, 0.001)
+check("rate(fps, dt) advances scene.t by dt", abs(s5.t - 0.1) < 1e-9, f"t={s5.t:.4f}")
+s5.clear()
+for _ in range(100):
+    s5.rate(100)
+check("rate(fps) alone advances scene.t by 1/fps", abs(s5.t - 1.0) < 1e-9)
+
+s6 = Scene(mode="record")
+b6 = Ball(pos=vector(0, 0), scene=s6)
+
+
+def drift(dt):
+    b6.pos = b6.pos + vector(1, 0) * dt
+
+
+s6.run(drift, dt=0.01, duration=3.0, fps=30)
+check("playback speed not distorted by substep rounding",
+      abs(s6.frame - (1 + 3.0 * 30)) <= 1, f"frames={s6.frame}, expected ~91")
+before = s6.frame
+s6.run(drift, dt=0.01, duration=10.0, fps=30, max_frames=20)
+check("run(max_frames=) caps this run, not the scene total",
+      s6.frame - before == 20, f"rendered {s6.frame - before}")
+
+print("\n[html escaping]")
+s7 = Scene(mode="record")
+Label(pos=vector(0, 0), text="</script><b>x</b> __TITLE__", scene=s7)
+Ball(scene=s7)
+s7.render()
+h7 = s7.recorder.html(100, 100, "#fff", 30, "<i>t</i>")
+check("label text can't close the script tag", h7.count("</script>") == 1)
+check("title is escaped", "<i>" not in h7 and "&lt;i&gt;" in h7)
+check("data text isn't treated as a placeholder", "__TITLE__" in h7)
+
+print("\n[mouse]")
+m = s7.mouse
+m.clicked = True
+check("clicked is true once per click", m.clicked is True and m.clicked is False)
 
 print("\n" + ("ALL PASS" if not FAIL else f"{len(FAIL)} FAILED: {FAIL}"))
 sys.exit(1 if FAIL else 0)

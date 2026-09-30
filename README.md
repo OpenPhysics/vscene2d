@@ -69,6 +69,10 @@ within `dt` rather than to within a frame.
 
 `step` is called as `step(dt)` or `step(dt, t)`, whichever you define.
 
+In a bare `rate()` loop the scene can't see your timestep, so `scene.t` advances by `1/fps`
+per call. Write `rate(100, dt)` to keep `scene.t` — and the player's time readout — in
+simulated time.
+
 ### 2. Animations survive being saved
 
 A live widget is a *kernel* artifact. Save the notebook, push it to GitHub, hand it to a
@@ -104,13 +108,14 @@ comm channel.
 ## API
 
 ```python
-vector(x, y)                    # immutable; .mag .mag2 .norm() .hat .dot() .cross()
+vector(x, y)                    # vector(x, y, 0) also accepted; immutable; .mag .mag2 .norm() .hat .dot() .cross()
                                 #            .rotate(rad) .proj() .theta
 dot(a, b)  cross(a, b)  mag(a)  norm(a)  hat(a)      # function forms of the same
 ```
 
-`vector` is immutable on purpose. `ball.pos.x = 5` would silently bypass the position
-setter, so it raises with an explanation instead of quietly doing nothing visible.
+`vector` is immutable on purpose. Trails store the positions they sample, so `ball.pos.x = 5`
+mutating in place would drag every recorded trail point along with it; it raises with an
+explanation instead. `sum(forces)` works.
 
 | object | |
 |---|---|
@@ -133,7 +138,7 @@ register with the current scene on construction, so you never pass one explicitl
 | graphing | |
 |---|---|
 | `Graph(title, xtitle, ytitle)` | second canvas, repaints on the same frames |
-| `gcurve(color, label, every=, dot=)` | one trace; `.plot(x, y)` or `.plot((x, y))` |
+| `gcurve(color, label, every=, dot=)` | one trace; `.plot(x, y)` or `.plot((x, y))`; `dot=True` marks the latest point |
 
 `every=20` thins a trace. 20 000 integration steps is more points than a 560-pixel plot can
 show, and drawing them all 30 times a second is what makes browser plots stutter.
@@ -147,6 +152,7 @@ scrubbable HTML block.
 | `scene.set_view(center=, range=)` | pin the view, stop autoscaling |
 | `Scene(center=, range=)` | same, at construction |
 | `scene.mouse.pos` | cursor in world coordinates (live mode) |
+| `scene.mouse.pressed` / `.clicked` | button held; `clicked` is true once per click (reading it clears it) |
 | `scene.player(fps=)` / `scene.save_html(path)` | export |
 | `scene.clear()` | delete objects, reset the clock (keeps the camera) |
 

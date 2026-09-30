@@ -109,7 +109,7 @@ def _paint(cv, prims, cam):
 
         if t == "circle":
             x, y = cam.to_px(p["x"], p["y"])
-            r = max(cam.px_len(p["r"]), 1.0)
+            r = p.get("rpx") or max(cam.px_len(p["r"]), 1.0)
             if p.get("fill"):
                 cv.fill_style = p["fill"]
                 cv.fill_circle(x, y, r)

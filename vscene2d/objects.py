@@ -7,7 +7,7 @@ standalone HTML animation in an exported notebook, or run headless in a test
 with no display at all.
 
 Primitive dicts (world coordinates; line widths and text sizes in pixels):
-    {"t":"circle", "x","y","r", "fill","stroke","lw"}
+    {"t":"circle", "x","y","r", "fill","stroke","lw"}  (optional "rpx": radius in px)
     {"t":"rect",   "x","y","w","h","angle", "fill","stroke","lw"}
     {"t":"poly",   "pts":[x0,y0,x1,y1,...], "stroke","fill","lw","closed"}
     {"t":"arrow",  "x","y","dx","dy", "stroke","lw","head"}
@@ -192,15 +192,15 @@ class Spring(Object2D):
             return
         u = d / L
         n = vector(-u.y, u.x)
-        pts = []
+        # Flat lead-ins over the first and last 10%, all `coils` in between.
+        pts = [self.start.x, self.start.y]
         steps = self.coils * 4
         for i in range(steps + 1):
-            f = i / steps
-            # flat lead-ins at both ends
-            env = 0.0 if (f < 0.1 or f > 0.9) else 1.0
-            off = self.amplitude * env * (1 if (i % 4 == 1) else (-1 if i % 4 == 3 else 0))
+            f = 0.1 + 0.8 * i / steps
+            off = self.amplitude * (1 if (i % 4 == 1) else (-1 if i % 4 == 3 else 0))
             p = self.start + u * (L * f) + n * off
             pts += [p.x, p.y]
+        pts += [self.end.x, self.end.y]
         out.append({"t": "poly", "pts": pts, "stroke": self.color,
                     "fill": None, "lw": self.lw, "closed": False})
 

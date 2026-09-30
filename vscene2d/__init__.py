@@ -1,4 +1,4 @@
-"""Reconstructed package __init__ (the shipped zip had none)."""
+"""vscene2d -- VPython-style 2D physics scenes that run natively in Jupyter."""
 
 from .vector import vector, dot, cross, mag, norm, hat
 from .camera import Camera, PlotCamera, nice_step

@@ -199,7 +199,8 @@ class gcurve:
                     "fill": None, "lw": self.lw, "closed": False})
         if self.dot:
             out.append({"t": "circle", "x": self.xs[-1], "y": self.ys[-1],
-                        "r": 0.0, "fill": self.color, "stroke": None, "lw": 0})
+                        "r": 0.0, "rpx": 4, "fill": self.color, "stroke": None,
+                        "lw": 0})
 
 
 def _current_graph():
