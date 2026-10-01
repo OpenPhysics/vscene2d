@@ -233,6 +233,11 @@ s6.run(drift, dt=0.01, duration=10.0, fps=30, max_frames=20)
 check("run(max_frames=) caps this run, not the scene total",
       s6.frame - before == 20, f"rendered {s6.frame - before}")
 
+slow = Scene(mode="record", grid=False)
+slow.run(lambda dt: None, dt=0.1, fps=30, speed=0.1, max_frames=31)
+check("slow playback can render frames without an integration step",
+      abs(slow.t - 0.1) < 1e-9, f"t={slow.t:.4f}")
+
 print("\n[html escaping]")
 s7 = Scene(mode="record")
 Label(pos=vector(0, 0), text="</script><b>x</b> __TITLE__", scene=s7)

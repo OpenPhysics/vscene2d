@@ -292,7 +292,7 @@ class Scene:
         self.render()
         while True:
             owed += per_frame
-            nsub = max(1, int(owed / dt + 1e-9))
+            nsub = max(0, int(owed / dt + 1e-9))
             owed -= nsub * dt
             for _ in range(nsub):
                 call()
