@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vscene2d"
-version = "0.2.2"
+version = "0.3.0"
 description = "VPython-style 2D physics scenes that run natively in Jupyter"
 readme = "README.md"
 requires-python = ">=3.11"
