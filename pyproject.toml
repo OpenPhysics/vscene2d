@@ -7,7 +7,7 @@ name = "vscene2d"
 version = "0.2.2"
 description = "VPython-style 2D physics scenes that run natively in Jupyter"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = []
 keywords = ["physics", "simulation", "jupyter", "vpython", "education", "animation"]
