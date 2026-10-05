@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 
-from .backends import NullBackend, make_backend
+from .backends import NullBackend, in_notebook, make_backend
 from .camera import PlotCamera
 from .objects import color
 from .recorder import Recorder
@@ -40,6 +40,11 @@ class Graph:
         self.curves = []
         self.camera = PlotCamera(width, height)
 
+        if mode == "live" and not in_notebook():
+            raise RuntimeError(
+                "Graph(mode='live') requires a Jupyter notebook. "
+                "Omit mode to follow the scene, or pass mode='record'."
+            )
         live = self.scene.mode == "live" if mode is None else (mode == "live")
         self.backend = (make_backend(width, height, background, prefer_live=True)
                         if live else NullBackend(width, height, background))
@@ -148,6 +153,8 @@ class Graph:
         for c in self.curves:
             c.clear()
         self.recorder.clear()
+        self.camera._seeded = False
+        self._cam_key = None
 
 
 class gcurve:

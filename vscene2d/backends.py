@@ -181,6 +181,33 @@ def _paint(cv, prims, cam):
             cv.global_alpha = 1.0
 
 
+def pump_kernel():
+    """Process one IPython kernel iteration so widget events can land.
+
+    ``rate`` / ``run`` call this in live mode between frames. ``time.sleep``
+    blocks the kernel, which freezes ``scene.mouse`` for the whole loop.
+    IPython is optional: with no kernel, or no ``do_one_iteration``, this
+    returns and the caller blocks as before.
+    """
+    try:
+        from IPython import get_ipython
+    except Exception:
+        return
+    ip = get_ipython()
+    if ip is None:
+        return
+    kernel = getattr(ip, "kernel", None)
+    if kernel is None:
+        return
+    step = getattr(kernel, "do_one_iteration", None)
+    if step is None:
+        return
+    try:
+        step()
+    except Exception:
+        return
+
+
 def in_notebook():
     """True only inside a real kernel with a widget-capable front end.
 

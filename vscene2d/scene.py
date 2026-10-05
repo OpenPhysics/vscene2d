@@ -22,13 +22,14 @@ import inspect
 import math
 import time
 
-from .backends import NullBackend, make_backend
+from .backends import NullBackend, in_notebook, make_backend, pump_kernel
 from .camera import Camera
 from .objects import Object2D, Trail, AttachedArrow, color
 from .recorder import Recorder
 from .vector import vector
 
 _scene = None
+_unbound = []
 _INF = float("inf")
 
 
@@ -37,6 +38,51 @@ def get_scene():
     if _scene is None:
         _scene = Scene()
     return _scene
+
+
+def attach_object(obj, scene=None):
+    """Register ``obj`` with ``scene``, the current scene, or the unbound list.
+
+    ``scene=None`` means "the current scene". When nothing has been constructed
+    yet the object stays unbound; the next ``Scene()`` adopts those objects.
+    That is what makes ``Ball(); Scene(mode="record")`` put the ball in that
+    scene instead of an implicit scene ``get_scene()`` would have built.
+    """
+    target = _scene if scene is None else scene
+    obj.scene = target
+    if target is None:
+        _unbound.append(obj)
+    else:
+        target._add(obj)
+
+
+def detach_object(obj):
+    """Remove ``obj`` from its scene, or from the unbound list."""
+    if obj.scene is not None:
+        obj.scene._remove(obj)
+        return
+    try:
+        _unbound.remove(obj)
+    except ValueError:
+        pass
+
+
+def _adopt_unbound(scene):
+    global _unbound
+    pending = _unbound
+    _unbound = []
+    for obj in pending:
+        obj.scene = scene
+        scene._add(obj)
+
+
+def _require_positive(name, value):
+    try:
+        ok = value > 0
+    except TypeError:
+        ok = False
+    if not ok:
+        raise ValueError(f"{name} must be positive, got {value!r}")
 
 
 class Mouse:
@@ -67,16 +113,23 @@ class Scene:
     Parameters
     ----------
     mode : "live" | "record" | "auto"
-        ``live`` draws to an ipycanvas widget as the loop runs.
+        ``live`` draws to an ipycanvas widget as the loop runs. Outside a
+        notebook this raises; it does not silently switch to recording.
         ``record`` skips the widget entirely, runs at full speed, and is
         played back afterwards with ``scene.player()``.
-        ``auto`` uses ``live`` if ipycanvas is importable, else ``record``.
+        ``auto`` uses ``live`` inside a notebook, and falls back to ``record``
+        otherwise.
     """
 
     def __init__(self, width=640, height=480, title="", background="#fbfbfd",
                  center=None, range=None, autoscale=None, grid=True,
                  mode="auto", max_frames=2000):
         global _scene
+        if mode == "live" and not in_notebook():
+            raise RuntimeError(
+                "Scene(mode='live') requires a Jupyter notebook. "
+                "Use mode='record', or mode='auto' to fall back outside a notebook."
+            )
         _scene = self
 
         self.width = width
@@ -85,6 +138,7 @@ class Scene:
         self.background = background
         self.grid = grid
         self.objects = []
+        _adopt_unbound(self)
         self._graphs = []
         self.t = 0.0
         self.mouse = Mouse()
@@ -127,11 +181,13 @@ class Scene:
             self.objects.remove(obj)
 
     def clear(self):
-        """Delete every object and reset the clock (keeps the camera)."""
+        """Delete every object, clear graphs, and reset the clock (keeps the camera)."""
         self.objects.clear()
         self.recorder.clear()
         self.t = 0.0
         self.frame = 0
+        for g in self._graphs:
+            g.clear()
 
     # --- display ------------------------------------------------------
     def show(self):
@@ -160,6 +216,8 @@ class Scene:
         xmin = ymin = _INF
         xmax = ymax = -_INF
         for o in self.objects:
+            if not o.visible:
+                continue
             a, b, c, d = o.bounds()
             if a < xmin:
                 xmin = a
@@ -235,13 +293,48 @@ class Scene:
         self.frame += 1
 
     # --- animation loops ----------------------------------------------
+    def _pump(self):
+        """Let the kernel handle widget messages (mouse) between frames."""
+        if self.mode == "live":
+            pump_kernel()
+
+    def _wait(self, delay):
+        """Sleep ``delay`` seconds. In live mode, yield to the kernel while waiting.
+
+        ``time.sleep`` alone blocks the Jupyter kernel, so ``scene.mouse`` would
+        stay frozen for the whole loop. Live mode pumps ``do_one_iteration``
+        when IPython is available. With no kernel, the wait still blocks and
+        mouse state does not change until the loop returns.
+        """
+        if self.mode != "live":
+            if delay > 0:
+                time.sleep(delay)
+            return
+        if delay <= 0:
+            self._pump()
+            return
+        end = time.perf_counter() + delay
+        while True:
+            self._pump()
+            remaining = end - time.perf_counter()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.02, remaining))
+
     def rate(self, fps, dt=None):
         """VPython-compatible: render a frame and pace the loop to ``fps``.
 
         ``scene.t`` can't see the loop's own timestep, so pass it as ``dt`` to
         keep ``scene.t`` (and the player's time readout) in simulated time.
         Without it, ``scene.t`` advances by ``1/fps`` per call.
+
+        In live mode the pause between frames yields to the IPython kernel when
+        one is running, so ``scene.mouse`` can update. Outside a kernel the
+        pause blocks and mouse state stays as it was when the loop started.
         """
+        _require_positive("fps", fps)
+        if dt is not None:
+            _require_positive("dt", dt)
         self._fps_hint = fps
         now = time.perf_counter()
         target = getattr(self, "_next_tick", None)
@@ -249,15 +342,18 @@ class Scene:
         if self.mode == "live":
             if target is None:
                 self._next_tick = now + 1.0 / fps
+                self._pump()
             else:
                 delay = target - time.perf_counter()
                 if delay > 0:
-                    time.sleep(delay)
-                elif delay < -1.0 and not self._lag_warned:
-                    self._lag_warned = True
-                    print("vscene2d: the loop can't keep up with rate(%g). "
-                          "Try Scene(mode='record') and scene.player(), or "
-                          "scene.run(step, dt=..., fps=30)." % fps)
+                    self._wait(delay)
+                else:
+                    self._pump()
+                    if delay < -1.0 and not self._lag_warned:
+                        self._lag_warned = True
+                        print("vscene2d: the loop can't keep up with rate(%g). "
+                              "Try Scene(mode='record') and scene.player(), or "
+                              "scene.run(step, dt=..., fps=30)." % fps)
                 self._next_tick = max(target + 1.0 / fps, time.perf_counter())
         self.t += dt if dt is not None else 1.0 / fps
 
@@ -268,9 +364,17 @@ class Scene:
         ``step`` is called as ``step(dt)`` or ``step(dt, t)``.
         ``speed`` is simulated seconds per real second (0.25 = slow motion).
         ``until`` is a predicate; the run stops as soon as it returns True.
-        ``max_frames`` caps the frames rendered by this call; without it the
-        run stops once the scene's recorder is full.
+        ``max_frames`` caps the frames rendered by this call (the initial frame
+        counts, so ``max_frames=1`` records that frame and returns). Without
+        it the run stops once the scene's recorder is full, and ``player()`` /
+        ``save_html()`` say so — a full recorder is not a finished simulation.
+
+        In live mode the pause between frames yields to the IPython kernel when
+        one is running, so ``scene.mouse`` can update. Outside a kernel the
+        pause blocks and mouse state stays as it was when the loop started.
         """
+        _require_positive("dt", dt)
+        _require_positive("fps", fps)
         if realtime is None:
             realtime = (self.mode == "live")
         try:
@@ -290,6 +394,8 @@ class Scene:
         wall = time.perf_counter()
 
         self.render()
+        if self._stop_for_frame_cap(start_frame, max_frames):
+            return self
         while True:
             owed += per_frame
             nsub = max(0, int(owed / dt + 1e-9))
@@ -305,23 +411,60 @@ class Scene:
             self.render()
             if t_end is not None and self.t >= t_end:
                 return self
-            if max_frames is not None:
-                if self.frame - start_frame >= max_frames:
-                    return self
-            elif self.frame >= self.recorder.max_frames:
+            if self._stop_for_frame_cap(start_frame, max_frames):
                 return self
             if realtime:
                 wall += budget
                 delay = wall - time.perf_counter()
                 if delay > 0:
-                    time.sleep(delay)
+                    self._wait(delay)
                 else:
+                    self._pump()
                     wall = time.perf_counter()
                     if delay < -1.0 and not self._lag_warned:
                         self._lag_warned = True
                         print("vscene2d: rendering slower than %g fps. "
                               "Use Scene(mode='record') for full speed." % fps)
         return self
+
+    def _stop_for_frame_cap(self, start_frame, max_frames):
+        """True when this call has rendered its frame budget.
+
+        The initial ``render()`` counts. Hitting the recorder capacity stops
+        the run and marks the recording truncated even if no later frame was
+        refused (``dropped`` stays 0 in that case).
+        """
+        if max_frames is not None:
+            return self.frame - start_frame >= max_frames
+        if self.frame >= self.recorder.max_frames:
+            self._note_recorder_full()
+            return True
+        return False
+
+    def _note_recorder_full(self):
+        if self.recorder.truncated:
+            return
+        self.recorder.truncated = True
+        print("vscene2d: stopped after %d frames (recorder max_frames). "
+              "Raise Scene(max_frames=...) to record the rest of the run."
+              % len(self.recorder))
+
+    def _playback_title(self, title):
+        note = self.title if title is None else title
+        rec = self.recorder
+        if not (rec.truncated or rec.dropped):
+            return note
+        prefix = (note + "  ") if note else ""
+        shown = len(rec)
+        if rec.dropped:
+            extra = (f"(showing first {shown} frames; "
+                     f"{rec.dropped} more were dropped -- raise "
+                     f"Scene(max_frames=...) if you need them)")
+        else:
+            extra = (f"(showing first {shown} frames; "
+                     f"recording stopped at the frame cap -- raise "
+                     f"Scene(max_frames=...) if you need them)")
+        return prefix + extra
 
     # --- playback -----------------------------------------------------
     def player(self, fps=None, title=None):
@@ -334,25 +477,20 @@ class Scene:
 
         if len(self.recorder) == 0:
             return HTML("<em>vscene2d: nothing recorded yet.</em>")
-        note = title if title is not None else self.title
-        if self.recorder.dropped:
-            note = (note + "  ") if note else ""
-            note += (f"(showing first {len(self.recorder)} frames; "
-                     f"{self.recorder.dropped} more were dropped -- raise "
-                     f"Scene(max_frames=...) if you need them)")
         return HTML(self.recorder.html(self.width, self.height,
                                        self.background,
-                                       fps or self._fps_hint, note))
+                                       fps or self._fps_hint,
+                                       self._playback_title(title)))
 
     def save_html(self, path, fps=None, title=None):
         """Write the recorded animation to a standalone .html file."""
         html = self.recorder.html(self.width, self.height, self.background,
                                   fps or self._fps_hint,
-                                  title if title is not None else self.title)
+                                  self._playback_title(title))
         doc = ("<!doctype html><meta charset='utf-8'>"
                "<body style=\"font-family:system-ui,sans-serif;margin:24px\">"
                + html + "</body>")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(doc)
         return path
 
@@ -369,5 +507,10 @@ class Scene:
 
 
 def rate(fps, dt=None):
-    """Module-level ``rate()`` -- paces the current scene, exactly like VPython."""
+    """Module-level ``rate()`` -- paces the current scene, exactly like VPython.
+
+    In live mode this yields to the IPython kernel between frames when a kernel
+    is running, so ``scene.mouse`` can update. With no kernel the pause blocks
+    and mouse state does not change until the loop returns.
+    """
     get_scene().rate(fps, dt)

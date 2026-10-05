@@ -43,22 +43,34 @@ class Object2D:
     """Base class: registers with the scene, tracks visibility."""
 
     def __init__(self, scene=None, color=color.blue, opacity=1.0, visible=True):
-        from .scene import get_scene
-        self.scene = scene if scene is not None else get_scene()
+        from .scene import attach_object
         self.color = color
         self.opacity = opacity
         self.visible = visible
-        self.scene._add(self)
+        # Join the given scene, or the current one. Objects created before any
+        # Scene() stay unbound until the first Scene() adopts them — calling
+        # get_scene() here would build an orphan scene and leave them behind.
+        attach_object(self, scene)
+
+    def _prim(self, spec):
+        spec["alpha"] = self.opacity
+        return spec
 
     def bounds(self):
         """(xmin, ymin, xmax, ymax) in world units, for autoscale."""
+        if not self.visible:
+            return (_INF, _INF, -_INF, -_INF)
+        return self._bounds()
+
+    def _bounds(self):
         return (_INF, _INF, -_INF, -_INF)
 
     def emit(self, out, cam):
         """Append primitives to the list `out`."""
 
     def remove(self):
-        self.scene._remove(self)
+        from .scene import detach_object
+        detach_object(self)
 
 
 class Ball(Object2D):
@@ -71,15 +83,15 @@ class Ball(Object2D):
         super().__init__(color=color, **kw)
         self.trail = Trail(self, retain=retain, color=color, scene=self.scene) if make_trail else None
 
-    def bounds(self):
+    def _bounds(self):
         r = self.radius
         return (self.pos.x - r, self.pos.y - r, self.pos.x + r, self.pos.y + r)
 
     def emit(self, out, cam):
         if not self.visible:
             return
-        out.append({"t": "circle", "x": self.pos.x, "y": self.pos.y,
-                    "r": self.radius, "fill": self.color, "stroke": None, "lw": 0})
+        out.append(self._prim({"t": "circle", "x": self.pos.x, "y": self.pos.y,
+                               "r": self.radius, "fill": self.color, "stroke": None, "lw": 0}))
 
 
 class Box(Object2D):
@@ -93,7 +105,7 @@ class Box(Object2D):
         self.filled = filled
         super().__init__(color=color, **kw)
 
-    def bounds(self):
+    def _bounds(self):
         hx, hy = self.size.x / 2, self.size.y / 2
         c, s = abs(math.cos(self.angle)), abs(math.sin(self.angle))
         ex, ey = hx * c + hy * s, hx * s + hy * c
@@ -102,10 +114,10 @@ class Box(Object2D):
     def emit(self, out, cam):
         if not self.visible:
             return
-        out.append({"t": "rect", "x": self.pos.x, "y": self.pos.y,
-                    "w": self.size.x, "h": self.size.y, "angle": self.angle,
-                    "fill": self.color if self.filled else None,
-                    "stroke": None if self.filled else self.color, "lw": 2})
+        out.append(self._prim({"t": "rect", "x": self.pos.x, "y": self.pos.y,
+                               "w": self.size.x, "h": self.size.y, "angle": self.angle,
+                               "fill": self.color if self.filled else None,
+                               "stroke": None if self.filled else self.color, "lw": 2}))
 
 
 class Arrow(Object2D):
@@ -127,7 +139,7 @@ class Arrow(Object2D):
     def tip(self):
         return self.pos + self.axis * self.scale
 
-    def bounds(self):
+    def _bounds(self):
         p, q = self.pos, self.tip
         return (min(p.x, q.x), min(p.y, q.y), max(p.x, q.x), max(p.y, q.y))
 
@@ -137,9 +149,9 @@ class Arrow(Object2D):
         d = self.axis * self.scale
         if d.mag == 0:
             return
-        out.append({"t": "arrow", "x": self.pos.x, "y": self.pos.y,
-                    "dx": d.x, "dy": d.y, "stroke": self.color,
-                    "lw": self.lw, "head": 10})
+        out.append(self._prim({"t": "arrow", "x": self.pos.x, "y": self.pos.y,
+                               "dx": d.x, "dy": d.y, "stroke": self.color,
+                               "lw": self.lw, "head": 10}))
 
 
 class Segment(Object2D):
@@ -151,17 +163,17 @@ class Segment(Object2D):
         self.lw = lw
         super().__init__(color=color, **kw)
 
-    def bounds(self):
+    def _bounds(self):
         a, b = self.start, self.end
         return (min(a.x, b.x), min(a.y, b.y), max(a.x, b.x), max(a.y, b.y))
 
     def emit(self, out, cam):
         if not self.visible:
             return
-        out.append({"t": "poly",
-                    "pts": [self.start.x, self.start.y, self.end.x, self.end.y],
-                    "stroke": self.color, "fill": None, "lw": self.lw,
-                    "closed": False})
+        out.append(self._prim({"t": "poly",
+                               "pts": [self.start.x, self.start.y, self.end.x, self.end.y],
+                               "stroke": self.color, "fill": None, "lw": self.lw,
+                               "closed": False}))
 
 
 class Spring(Object2D):
@@ -177,7 +189,7 @@ class Spring(Object2D):
         self.lw = lw
         super().__init__(color=color, **kw)
 
-    def bounds(self):
+    def _bounds(self):
         a, b = self.start, self.end
         m = self.amplitude
         return (min(a.x, b.x) - m, min(a.y, b.y) - m,
@@ -201,8 +213,8 @@ class Spring(Object2D):
             p = self.start + u * (L * f) + n * off
             pts += [p.x, p.y]
         pts += [self.end.x, self.end.y]
-        out.append({"t": "poly", "pts": pts, "stroke": self.color,
-                    "fill": None, "lw": self.lw, "closed": False})
+        out.append(self._prim({"t": "poly", "pts": pts, "stroke": self.color,
+                               "fill": None, "lw": self.lw, "closed": False}))
 
 
 class Label(Object2D):
@@ -220,9 +232,9 @@ class Label(Object2D):
     def emit(self, out, cam):
         if not self.visible:
             return
-        out.append({"t": "text", "x": self.pos.x, "y": self.pos.y,
-                    "s": str(self.text), "fill": self.color,
-                    "size": self.size, "align": self.align})
+        out.append(self._prim({"t": "text", "x": self.pos.x, "y": self.pos.y,
+                               "s": str(self.text), "fill": self.color,
+                               "size": self.size, "align": self.align}))
 
 
 class Curve(Object2D):
@@ -240,7 +252,7 @@ class Curve(Object2D):
     def clear(self):
         self.points.clear()
 
-    def bounds(self):
+    def _bounds(self):
         if not self.points:
             return (_INF, _INF, -_INF, -_INF)
         xs = [p.x for p in self.points]
@@ -253,8 +265,8 @@ class Curve(Object2D):
         pts = []
         for p in self.points:
             pts += [p.x, p.y]
-        out.append({"t": "poly", "pts": pts, "stroke": self.color,
-                    "fill": None, "lw": self.lw, "closed": False})
+        out.append(self._prim({"t": "poly", "pts": pts, "stroke": self.color,
+                               "fill": None, "lw": self.lw, "closed": False}))
 
 
 class Trail(Object2D):
@@ -285,7 +297,7 @@ class Trail(Object2D):
     def clear(self):
         self.points.clear()
 
-    def bounds(self):
+    def _bounds(self):
         if not self.points:
             return (_INF, _INF, -_INF, -_INF)
         xs = [p.x for p in self.points]
@@ -298,8 +310,8 @@ class Trail(Object2D):
         pts = []
         for p in self.points:
             pts += [p.x, p.y]
-        out.append({"t": "poly", "pts": pts, "stroke": self.color,
-                    "fill": None, "lw": self.lw, "closed": False})
+        out.append(self._prim({"t": "poly", "pts": pts, "stroke": self.color,
+                               "fill": None, "lw": self.lw, "closed": False}))
 
 
 class AttachedArrow(Arrow):
@@ -336,7 +348,15 @@ _TRAIL_DEFAULT_COLOR = color.red
 
 
 def attach_trail(obj, retain=None, color=None, lw=2):
-    """Give an existing object a trail."""
+    """Give an existing object a trail.
+
+    A second call removes the previous trail from the scene so the old
+    polyline does not keep drawing underneath the new one.
+    """
+    prev = getattr(obj, "trail", None)
+    if prev is not None:
+        prev.remove()
+        obj.trail = None
     t = Trail(obj, retain=retain,
               color=color or getattr(obj, "color", _TRAIL_DEFAULT_COLOR),
               lw=lw, scene=obj.scene)

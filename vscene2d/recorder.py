@@ -43,6 +43,9 @@ class Recorder:
         self.max_frames = max_frames
         self._prev = None
         self.dropped = 0
+        # Set when a run stops because the recorder is full, including the
+        # case where capture never refused a frame (dropped stays 0).
+        self.truncated = False
 
     def __len__(self):
         return len(self.frames)
@@ -53,6 +56,7 @@ class Recorder:
         self.times.clear()
         self._prev = None
         self.dropped = 0
+        self.truncated = False
 
     def capture(self, prims, cam, t):
         if len(self.frames) >= self.max_frames:
@@ -167,6 +171,8 @@ _PLAYER_HTML = """
     var P = abs[f];
     for (var i=0;i<P.length;i++){
       var p = P[i], a;
+      g.save();
+      if (p.alpha != null) g.globalAlpha = p.alpha;
       if (p.t === "circle"){
         a = C.px(p.x,p.y);
         g.beginPath(); g.arc(a[0],a[1],p.rpx||Math.max(p.r*C.s,1),0,6.2832);
@@ -180,35 +186,38 @@ _PLAYER_HTML = """
         if (p.stroke){ g.strokeStyle=p.stroke; g.lineWidth=p.lw||1; g.strokeRect(-w/2,-h/2,w,h); }
         g.restore();
       } else if (p.t === "poly"){
-        if (p.pts.length < 4) continue;
-        g.beginPath();
-        for (var k=0;k<p.pts.length;k+=2){
-          a = C.px(p.pts[k],p.pts[k+1]);
-          if (k===0) g.moveTo(a[0],a[1]); else g.lineTo(a[0],a[1]);
+        if (p.pts.length >= 4) {
+          g.beginPath();
+          for (var k=0;k<p.pts.length;k+=2){
+            a = C.px(p.pts[k],p.pts[k+1]);
+            if (k===0) g.moveTo(a[0],a[1]); else g.lineTo(a[0],a[1]);
+          }
+          if (p.closed) g.closePath();
+          if (p.fill){ g.fillStyle=p.fill; g.fill(); }
+          if (p.stroke){ g.strokeStyle=p.stroke; g.lineWidth=p.lw||1;
+                         g.lineJoin="round"; g.lineCap="round"; g.stroke(); }
         }
-        if (p.closed) g.closePath();
-        if (p.fill){ g.fillStyle=p.fill; g.fill(); }
-        if (p.stroke){ g.strokeStyle=p.stroke; g.lineWidth=p.lw||1;
-                       g.lineJoin="round"; g.lineCap="round"; g.stroke(); }
       } else if (p.t === "arrow"){
         var s0 = C.px(p.x,p.y), s1 = C.px(p.x+p.dx, p.y+p.dy);
         var dx=s1[0]-s0[0], dy=s1[1]-s0[1], L=Math.hypot(dx,dy);
-        if (L < 1e-9) continue;
-        var ux=dx/L, uy=dy/L, hd=Math.min(p.head||10, L*0.5);
-        var bx=s1[0]-ux*hd, by=s1[1]-uy*hd;
-        g.strokeStyle=p.stroke; g.lineWidth=p.lw||2; g.lineCap="round";
-        g.beginPath(); g.moveTo(s0[0],s0[1]); g.lineTo(bx,by); g.stroke();
-        g.fillStyle=p.stroke; g.beginPath();
-        g.moveTo(s1[0],s1[1]);
-        g.lineTo(bx-uy*hd*0.42, by+ux*hd*0.42);
-        g.lineTo(bx+uy*hd*0.42, by-ux*hd*0.42);
-        g.closePath(); g.fill();
+        if (L >= 1e-9) {
+          var ux=dx/L, uy=dy/L, hd=Math.min(p.head||10, L*0.5);
+          var bx=s1[0]-ux*hd, by=s1[1]-uy*hd;
+          g.strokeStyle=p.stroke; g.lineWidth=p.lw||2; g.lineCap="round";
+          g.beginPath(); g.moveTo(s0[0],s0[1]); g.lineTo(bx,by); g.stroke();
+          g.fillStyle=p.stroke; g.beginPath();
+          g.moveTo(s1[0],s1[1]);
+          g.lineTo(bx-uy*hd*0.42, by+ux*hd*0.42);
+          g.lineTo(bx+uy*hd*0.42, by-ux*hd*0.42);
+          g.closePath(); g.fill();
+        }
       } else if (p.t === "text"){
         a = C.px(p.x,p.y);
         g.fillStyle=p.fill||"#111"; g.font=(p.size||13)+"px sans-serif";
         g.textAlign=p.align||"center"; g.textBaseline=p.baseline||"middle";
         g.fillText(p.s, a[0], a[1]);
       }
+      g.restore();
     }
     lab.textContent = "t = " + (D.t[f]).toFixed(2) + " s";
   }

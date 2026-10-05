@@ -253,5 +253,104 @@ m = s7.mouse
 m.clicked = True
 check("clicked is true once per click", m.clicked is True and m.clicked is False)
 
+print("\n[truncation note]")
+import tempfile
+cap = Scene(mode="record", max_frames=3, grid=False, title="cap")
+Ball(pos=vector(0, 0), radius=0.2, scene=cap)
+cap.run(lambda dt: None, dt=0.1, duration=5, fps=30)
+check("recorder cap sets truncated while dropped stays 0",
+      cap.recorder.truncated and cap.recorder.dropped == 0,
+      f"truncated={cap.recorder.truncated} dropped={cap.recorder.dropped} n={len(cap.recorder)}")
+cap_path = os.path.join(tempfile.mkdtemp(), "cap.html")
+cap.save_html(cap_path, title="Δt")
+cap_html = open(cap_path, encoding="utf-8").read()
+check("save_html mentions the frame cap", "frame cap" in cap_html and "max_frames" in cap_html)
+check("save_html writes utf-8", "Δt" in cap_html)
+
+print("\n[opacity]")
+op = Scene(mode="record", grid=False)
+ball_op = Ball(pos=vector(0, 0), radius=0.2, opacity=0.25, scene=op)
+op_out = []
+ball_op.emit(op_out, op.camera)
+check("opacity in the primitive", op_out and op_out[0].get("alpha") == 0.25)
+op.render()
+op_html = op.recorder.html(80, 80, "#fff", 30, "")
+check("player honors alpha", "globalAlpha" in op_html and "0.25" in op_html)
+
+print("\n[dt and fps]")
+try:
+    Scene(mode="record").run(lambda dt: None, dt=0, duration=1)
+    check("dt=0 raises", False)
+except ValueError:
+    check("dt=0 raises", True)
+try:
+    Scene(mode="record").run(lambda dt: None, dt=-0.01, duration=1)
+    check("negative dt raises", False)
+except ValueError:
+    check("negative dt raises", True)
+try:
+    Scene(mode="record").rate(0)
+    check("fps=0 raises", False)
+except ValueError:
+    check("fps=0 raises", True)
+try:
+    Scene(mode="record").rate(-5)
+    check("negative fps raises", False)
+except ValueError:
+    check("negative fps raises", True)
+
+print("\n[max_frames=1]")
+one = Scene(mode="record", grid=False)
+one.run(lambda dt: None, dt=0.1, duration=10, fps=30, max_frames=1)
+check("max_frames=1 records exactly 1 frame",
+      one.frame == 1 and len(one.recorder) == 1,
+      f"frame={one.frame} recorded={len(one.recorder)}")
+
+print("\n[explicit live outside a notebook]")
+try:
+    Scene(mode="live")
+    check("explicit live outside notebook raises", False)
+except RuntimeError as e:
+    check("explicit live outside notebook raises", "notebook" in str(e).lower(), str(e))
+
+print("\n[clear graphs]")
+sg = Scene(mode="record", grid=False)
+Graph(scene=sg, title="g")
+gc = gcurve(graph=sg._graphs[0])
+gc.plot(0, 0)
+gc.plot(1, 1)
+sg.render()
+check("graph has samples before clear", len(gc.xs) == 2 and len(sg._graphs[0].recorder) >= 1)
+sg.clear()
+check("clear() clears graph curves", len(gc.xs) == 0 and len(gc.ys) == 0)
+check("clear() clears graph frames", len(sg._graphs[0].recorder) == 0)
+
+print("\n[hidden objects]")
+hid = Scene(mode="record", grid=False, autoscale=True)
+Ball(pos=vector(0, 0), radius=0.5, scene=hid)
+far = Ball(pos=vector(80, 0), radius=0.5, scene=hid, visible=False)
+empty = far.bounds()
+check("hidden bounds are empty", empty[0] > empty[2])
+hid.render()
+check("autoscale skips hidden objects", hid.camera.bounds[2] < 20, str(hid.camera.bounds))
+
+print("\n[ball then scene]")
+import vscene2d.scene as scene_mod
+scene_mod._scene = None
+scene_mod._unbound.clear()
+early = Ball(pos=vector(3, 4), radius=0.1)
+check("ball created before any scene stays unbound", early.scene is None)
+adopted = Scene(mode="record", grid=False)
+check("first explicit Scene adopts the ball", early in adopted.objects and early.scene is adopted)
+
+print("\n[replace trail]")
+tr_scene = Scene(mode="record", grid=False)
+tr_ball = Ball(pos=vector(0, 0), radius=0.2, make_trail=True, scene=tr_scene)
+old_trail = tr_ball.trail
+attach_trail(tr_ball, color=color.blue)
+check("new trail replaces the old one",
+      tr_ball.trail is not old_trail and old_trail not in tr_scene.objects
+      and tr_ball.trail in tr_scene.objects)
+
 print("\n" + ("ALL PASS" if not FAIL else f"{len(FAIL)} FAILED: {FAIL}"))
 sys.exit(1 if FAIL else 0)
