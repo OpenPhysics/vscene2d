@@ -1,5 +1,12 @@
 """vscene2d -- VPython-style 2D physics scenes that run natively in Jupyter."""
 
+from importlib.metadata import PackageNotFoundError, version as _version
+
+try:
+    __version__ = _version("vscene2d")
+except PackageNotFoundError:  # running from a source checkout that isn't installed
+    __version__ = "unknown"
+
 from .vector import vector, dot, cross, mag, norm, hat
 from .camera import Camera, PlotCamera, nice_step
 from .objects import (
