@@ -27,14 +27,24 @@ pip install "vscene2d[live]"   # the [live] extra pulls in ipycanvas + ipywidget
 ```
 
 The library itself has no dependencies — `pip install vscene2d` is enough if you only ever
-use `mode="record"`. For development, clone the repo and run `pip install -e ".[live]"`. You can also just put `vscene2d/` next to your notebook. Python 3.9+.
+use `mode="record"`. You can also just put `vscene2d/` next to your notebook. Python 3.9+.
 
 JupyterLab 4 and Notebook 7 pick up ipycanvas automatically. In Colab, run
 `from google.colab import output; output.enable_custom_widget_manager()` first —
 or skip the widget entirely and use `mode="record"`, which needs nothing but a browser.
 
-See `vscene2d_tour.ipynb` for a guided notebook tour and `demos_orbit_and_shm.html` for
-exported standalone animations.
+To work on the library itself:
+
+```bash
+git clone https://github.com/OpenPhysics/vscene2d.git
+cd vscene2d
+pip install -e ".[live]"
+```
+
+See [`vscene2d_tour.ipynb`](https://github.com/OpenPhysics/vscene2d/blob/main/vscene2d_tour.ipynb)
+for a guided notebook tour and
+[`demos_orbit_and_shm.html`](https://github.com/OpenPhysics/vscene2d/blob/main/demos_orbit_and_shm.html)
+for exported standalone animations.
 
 ---
 
@@ -217,6 +227,19 @@ No test framework and no display needed — it runs against the headless backend
 prints a line per check. Covers vector algebra, the camera transform and its round-trip, autoscale stability,
 substepping against analytic projectile range and flight time, energy conservation, the
 delta encoding round-trip against a fresh render, and the exported HTML's structure.
+
+## Releasing
+
+Releases are published to [PyPI](https://pypi.org/project/vscene2d/) by GitHub Actions
+(`.github/workflows/publish.yml`) using trusted publishing — no API token involved.
+
+1. Bump `version` in `pyproject.toml`, commit, and push to `main`.
+2. On GitHub, draft a new release with a tag matching that version (`v0.3.0` for
+   `version = "0.3.0"`) and publish it.
+
+The workflow checks the tag against `pyproject.toml`, runs the tests, builds the sdist and
+wheel, and uploads them. A version can only be uploaded to PyPI once, so a fix means a new
+version number.
 
 ## Licence
 
