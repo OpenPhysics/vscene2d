@@ -23,7 +23,7 @@ while ball.pos.y >= 0:
 ## Install
 
 ```bash
-pip install "vscene2d[live]"   # the [live] extra pulls in ipycanvas + ipywidgets
+pip install "vscene2d[live]"   # the [live] extra pulls in ipycanvas, ipywidgets, jupyter-ui-poll
 ```
 
 The library itself has no dependencies — `pip install vscene2d` is enough if you only ever
@@ -214,7 +214,9 @@ hand-rolled ones look bad.
 - 2D only, by design. If you need 3D, VPython in a separate tab is still the answer.
 - The live loop blocks the kernel, exactly as VPython's does. Interrupt with the stop button;
   `mode="record"` avoids the issue entirely.
-- Mouse input needs the live widget.
+- Mouse input needs the live widget. `scene.mouse` updates while a `rate()` / `run()` loop is
+  running on ipykernel 7 out of the box, and on ipykernel 5–6 (which includes Colab) with
+  `jupyter-ui-poll`, part of the `[live]` extra.
 - `max_frames` defaults to 2000; longer runs record the first 2000 and say so.
 
 ## Tests

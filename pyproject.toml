@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vscene2d"
-version = "0.2.0"
+version = "0.2.1"
 description = "VPython-style 2D physics scenes that run natively in Jupyter"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,7 +29,7 @@ Source = "https://github.com/OpenPhysics/vscene2d"
 Issues = "https://github.com/OpenPhysics/vscene2d/issues"
 
 [project.optional-dependencies]
-live = ["ipycanvas>=0.13", "ipywidgets>=8"]
+live = ["ipycanvas>=0.13", "ipywidgets>=8", "jupyter-ui-poll>=1.0"]
 
 [tool.setuptools.packages.find]
 include = ["vscene2d*"]

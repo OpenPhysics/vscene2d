@@ -303,8 +303,9 @@ class Scene:
 
         ``time.sleep`` alone blocks the Jupyter kernel, so ``scene.mouse`` would
         stay frozen for the whole loop. Live mode pumps ``do_one_iteration``
-        when IPython is available. With no kernel, the wait still blocks and
-        mouse state does not change until the loop returns.
+        when it can: by reading the shell socket on ipykernel 7, through
+        ``jupyter-ui-poll`` on ipykernel 5-6 (Colab), directly on older
+        kernels. Otherwise the wait blocks, as it does with no kernel.
         """
         if self.mode != "live":
             if delay > 0:
@@ -329,8 +330,8 @@ class Scene:
         Without it, ``scene.t`` advances by ``1/fps`` per call.
 
         In live mode the pause between frames yields to the IPython kernel when
-        one is running, so ``scene.mouse`` can update. Outside a kernel the
-        pause blocks and mouse state stays as it was when the loop started.
+        it can be pumped (ipykernel 7, or 5-6 with ``jupyter-ui-poll``), so
+        ``scene.mouse`` can update. Otherwise the pause blocks.
         """
         _require_positive("fps", fps)
         if dt is not None:
@@ -370,8 +371,8 @@ class Scene:
         ``save_html()`` say so — a full recorder is not a finished simulation.
 
         In live mode the pause between frames yields to the IPython kernel when
-        one is running, so ``scene.mouse`` can update. Outside a kernel the
-        pause blocks and mouse state stays as it was when the loop started.
+        it can be pumped (ipykernel 7, or 5-6 with ``jupyter-ui-poll``), so
+        ``scene.mouse`` can update. Otherwise the pause blocks.
         """
         _require_positive("dt", dt)
         _require_positive("fps", fps)
@@ -509,8 +510,8 @@ class Scene:
 def rate(fps, dt=None):
     """Module-level ``rate()`` -- paces the current scene, exactly like VPython.
 
-    In live mode this yields to the IPython kernel between frames when a kernel
-    is running, so ``scene.mouse`` can update. With no kernel the pause blocks
-    and mouse state does not change until the loop returns.
+    In live mode this yields to the IPython kernel between frames when it can
+    be pumped (ipykernel 7, or 5-6 with ``jupyter-ui-poll``), so
+    ``scene.mouse`` can update. Otherwise the pause blocks.
     """
     get_scene().rate(fps, dt)
