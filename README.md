@@ -1,5 +1,7 @@
 # vscene2d
 
+[![PyPI](https://img.shields.io/pypi/v/vscene2d)](https://pypi.org/project/vscene2d/)
+
 VPython's ergonomics, in 2D, running natively inside a Jupyter cell — no GlowScript,
 no WebGL, no separate browser tab.
 
