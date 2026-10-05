@@ -21,11 +21,11 @@ while ball.pos.y >= 0:
 ## Install
 
 ```bash
-pip install -e ".[live]"       # the [live] extra pulls in ipycanvas + ipywidgets
+pip install "vscene2d[live]"   # the [live] extra pulls in ipycanvas + ipywidgets
 ```
 
-The library itself has no dependencies — `pip install -e .` is enough if you only ever
-use `mode="record"`. You can also just put `vscene2d/` next to your notebook. Python 3.9+.
+The library itself has no dependencies — `pip install vscene2d` is enough if you only ever
+use `mode="record"`. For development, clone the repo and run `pip install -e ".[live]"`. You can also just put `vscene2d/` next to your notebook. Python 3.9+.
 
 JupyterLab 4 and Notebook 7 pick up ipycanvas automatically. In Colab, run
 `from google.colab import output; output.enable_custom_widget_manager()` first —

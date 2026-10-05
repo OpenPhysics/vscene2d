@@ -10,6 +10,23 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = []
+keywords = ["physics", "simulation", "jupyter", "vpython", "education", "animation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Jupyter",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+[project.urls]
+Homepage = "https://github.com/OpenPhysics/vscene2d"
+Source = "https://github.com/OpenPhysics/vscene2d"
+Issues = "https://github.com/OpenPhysics/vscene2d/issues"
 
 [project.optional-dependencies]
 live = ["ipycanvas>=0.13", "ipywidgets>=8"]
