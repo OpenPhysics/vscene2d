@@ -27,7 +27,7 @@ pip install "vscene2d[live]"   # the [live] extra pulls in ipycanvas, ipywidgets
 ```
 
 The library itself has no dependencies — `pip install vscene2d` is enough if you only ever
-use `mode="record"`. You can also just put `vscene2d/` next to your notebook. Python 3.10+.
+use `mode="record"`. You can also just put `vscene2d/` next to your notebook. Python 3.11+.
 
 JupyterLab 4 and Notebook 7 pick up ipycanvas automatically. In Colab, run
 `from google.colab import output; output.enable_custom_widget_manager()` first —
